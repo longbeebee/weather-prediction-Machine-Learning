@@ -1,0 +1,13 @@
+n_iter,task,model,total_training_time_seconds,mean_training_time_seconds,total_estimated_fit_count
+4,rain_classification,LogisticRegression,3.804532873793505,0.543504696256215,147
+20,rain_classification,LogisticRegression,2.87252883403562,0.4103612620050886,182
+4,rain_classification,SVM,22.865783292800188,3.266540470400027,147
+20,rain_classification,SVM,201.06685666681733,28.72383666668819,287
+4,rain_classification,XGBoostClassifier,34.662562624085695,4.951794660583671,147
+20,rain_classification,XGBoostClassifier,103.70971804193687,14.815674005990981,707
+4,temperature_regression,KNNRegressor,1.4715135018341243,0.21021621454773204,147
+20,temperature_regression,KNNRegressor,3.5065147519344464,0.5009306788477781,707
+4,temperature_regression,LinearRegression,0.020096331951208413,0.0028709045644583447,7
+20,temperature_regression,LinearRegression,0.021677415119484067,0.003096773588497724,7
+4,temperature_regression,XGBoostRegressor,92.9504304989241,13.27863292841773,147
+20,temperature_regression,XGBoostRegressor,254.66873820719775,36.38124831531396,707

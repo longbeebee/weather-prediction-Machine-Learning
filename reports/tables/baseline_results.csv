@@ -1,0 +1,5 @@
+split,task,model,primary_metric,value,training_time,mae,rmse,r2,accuracy,precision,recall,f1,roc_auc
+validation,temperature_regression,Baseline_TodayTemperature,rmse,2.5217198572108215,0.000536791980266571,1.8327868852459015,2.5217198572108215,0.7902429877191951,,,,,
+test,temperature_regression,Baseline_TodayTemperature,rmse,2.516298520000805,0.00042625004425644875,1.8296703296703296,2.516298520000805,0.7740149901670041,,,,,
+validation,rain_classification,Baseline_MajorityClass,f1,0.0,0.004028917057439685,,,,0.6202185792349727,0.0,0.0,0.0,0.5
+test,rain_classification,Baseline_MajorityClass,f1,0.0,0.0038653750671073794,,,,0.6071428571428571,0.0,0.0,0.0,0.5

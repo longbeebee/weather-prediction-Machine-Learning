@@ -1,0 +1,8 @@
+horizon_day,forecast_time,temperature_model,rain_model,predicted_temperature,predicted_rain,predicted_rain_probability,rain_threshold,predicted_rain_label,predicted_weather_level
+1,2025-12-31 12:00:00,LinearRegression,XGBoostClassifier,23.109486534434364,0,0.15946680307388306,0.2,no_rain,normal
+2,2026-01-01 12:00:00,LinearRegression,LogisticRegression,22.46629613922451,0,0.22908207723247978,0.4,no_rain,normal
+3,2026-01-02 12:00:00,XGBoostRegressor,LogisticRegression,18.532299041748047,0,0.24142122398600271,0.45,no_rain,cool
+4,2026-01-03 12:00:00,XGBoostRegressor,LogisticRegression,18.870630264282227,0,0.26799994645072434,0.4,no_rain,cool
+5,2026-01-04 12:00:00,XGBoostRegressor,LogisticRegression,18.588943481445312,0,0.26061708430832986,0.5,no_rain,cool
+6,2026-01-05 12:00:00,XGBoostRegressor,LogisticRegression,18.052331924438477,0,0.29557589356550074,0.4,no_rain,cool
+7,2026-01-06 12:00:00,XGBoostRegressor,SVM,18.237445831298828,0,0.2845640210711781,0.4,no_rain,cool

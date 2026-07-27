@@ -1,0 +1,11 @@
+task,model,training_time
+temperature_regression,Baseline_TodayTemperature,0.000536791980266571
+temperature_regression,Baseline_TodayTemperature,0.00042625004425644875
+rain_classification,Baseline_MajorityClass,0.004028917057439685
+rain_classification,Baseline_MajorityClass,0.0038653750671073794
+temperature_regression,LinearRegression,0.0020786250242963433
+temperature_regression,KNNRegressor,0.1899881249992177
+temperature_regression,XGBoostRegressor,13.740530041977763
+rain_classification,LogisticRegression,0.24055670900270343
+rain_classification,SVM,4.295352583983913
+rain_classification,XGBoostClassifier,8.045063750003465

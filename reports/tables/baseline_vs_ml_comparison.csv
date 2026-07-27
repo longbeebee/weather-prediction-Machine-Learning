@@ -1,0 +1,7 @@
+task,model,primary_metric,value
+temperature_regression,Baseline_TodayTemperature,rmse,2.5217198572108215
+temperature_regression,Baseline_TodayTemperature,rmse,2.516298520000805
+rain_classification,Baseline_MajorityClass,f1,0.0
+rain_classification,Baseline_MajorityClass,f1,0.0
+temperature_regression,LinearRegression,rmse,2.319491900039074
+rain_classification,LogisticRegression,f1,0.6871165644171779

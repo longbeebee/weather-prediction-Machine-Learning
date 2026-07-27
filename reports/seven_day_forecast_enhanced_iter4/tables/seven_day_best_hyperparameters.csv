@@ -1,0 +1,43 @@
+horizon_day,task,model,rank_test_score,mean_cv_rmse,mean_cv_f1,best_params,search_iter_budget,selected_model,selected_metric,selected_metric_value
+1,temperature_regression,LinearRegression,1,,,StandardScaler + LinearRegression,4,LinearRegression,validation_rmse,2.375423291725812
+1,temperature_regression,KNNRegressor,1,3.2940762734960067,,"{""model__n_neighbors"": 9, ""model__weights"": ""distance""}",4,,,
+1,temperature_regression,XGBoostRegressor,1,2.983615130381577,,"{""learning_rate"": 0.055245405728306586, ""max_depth"": 5, ""n_estimators"": 314}",4,,,
+1,rain_classification,LogisticRegression,1,,0.6267962056076015,"{""model__C"": 0.01}",4,,,
+1,rain_classification,SVM,1,,0.6252977301238121,"{""model__C"": 10.0, ""model__kernel"": ""rbf""}",4,,,
+1,rain_classification,XGBoostClassifier,1,,0.6303105077841282,"{""learning_rate"": 0.026844247528777843, ""max_depth"": 10, ""n_estimators"": 472}",4,XGBoostClassifier,validation_f1,0.6648199445983379
+2,temperature_regression,LinearRegression,1,,,StandardScaler + LinearRegression,4,LinearRegression,validation_rmse,3.209553713444624
+2,temperature_regression,KNNRegressor,1,3.8072899436316745,,"{""model__n_neighbors"": 23, ""model__weights"": ""uniform""}",4,,,
+2,temperature_regression,XGBoostRegressor,1,3.640705339020345,,"{""learning_rate"": 0.055245405728306586, ""max_depth"": 5, ""n_estimators"": 314}",4,,,
+2,rain_classification,LogisticRegression,1,,0.5789152949446008,"{""model__C"": 0.01}",4,LogisticRegression,validation_f1,0.6683673469387755
+2,rain_classification,SVM,1,,0.579823068725974,"{""model__C"": 0.1, ""model__kernel"": ""linear""}",4,,,
+2,rain_classification,XGBoostClassifier,1,,0.5381934401182231,"{""learning_rate"": 0.055245405728306586, ""max_depth"": 5, ""n_estimators"": 314}",4,,,
+3,temperature_regression,LinearRegression,1,,,StandardScaler + LinearRegression,4,,,
+3,temperature_regression,KNNRegressor,1,4.027969167879595,,"{""model__n_neighbors"": 23, ""model__weights"": ""uniform""}",4,,,
+3,temperature_regression,XGBoostRegressor,1,4.130044413630445,,"{""learning_rate"": 0.055245405728306586, ""max_depth"": 5, ""n_estimators"": 314}",4,XGBoostRegressor,validation_rmse,3.4520577792394453
+3,rain_classification,LogisticRegression,1,,0.5615163582333249,"{""model__C"": 0.01}",4,LogisticRegression,validation_f1,0.6470588235294118
+3,rain_classification,SVM,1,,0.5543833345521628,"{""model__C"": 0.1, ""model__kernel"": ""linear""}",4,,,
+3,rain_classification,XGBoostClassifier,1,,0.5326861537571175,"{""learning_rate"": 0.026844247528777843, ""max_depth"": 10, ""n_estimators"": 472}",4,,,
+4,temperature_regression,LinearRegression,1,,,StandardScaler + LinearRegression,4,,,
+4,temperature_regression,KNNRegressor,1,4.124332762242809,,"{""model__n_neighbors"": 23, ""model__weights"": ""uniform""}",4,,,
+4,temperature_regression,XGBoostRegressor,1,4.18377153632577,,"{""learning_rate"": 0.055245405728306586, ""max_depth"": 5, ""n_estimators"": 314}",4,XGBoostRegressor,validation_rmse,3.558253773196555
+4,rain_classification,LogisticRegression,1,,0.5457898411783324,"{""model__C"": 0.01}",4,LogisticRegression,validation_f1,0.6407766990291263
+4,rain_classification,SVM,1,,0.5565197328788216,"{""model__C"": 0.1, ""model__kernel"": ""linear""}",4,,,
+4,rain_classification,XGBoostClassifier,1,,0.4682735024923478,"{""learning_rate"": 0.026844247528777843, ""max_depth"": 10, ""n_estimators"": 472}",4,,,
+5,temperature_regression,LinearRegression,1,,,StandardScaler + LinearRegression,4,,,
+5,temperature_regression,KNNRegressor,1,4.172374858996828,,"{""model__n_neighbors"": 23, ""model__weights"": ""uniform""}",4,,,
+5,temperature_regression,XGBoostRegressor,1,4.082372912041971,,"{""learning_rate"": 0.026844247528777843, ""max_depth"": 10, ""n_estimators"": 472}",4,XGBoostRegressor,validation_rmse,3.6032854821884484
+5,rain_classification,LogisticRegression,1,,0.5619642735657547,"{""model__C"": 0.01}",4,LogisticRegression,validation_f1,0.627906976744186
+5,rain_classification,SVM,1,,0.5546271695479973,"{""model__C"": 0.1, ""model__kernel"": ""linear""}",4,,,
+5,rain_classification,XGBoostClassifier,1,,0.48518797880073816,"{""learning_rate"": 0.22227824312530747, ""max_depth"": 7, ""n_estimators"": 120}",4,,,
+6,temperature_regression,LinearRegression,1,,,StandardScaler + LinearRegression,4,,,
+6,temperature_regression,KNNRegressor,1,4.162464649144632,,"{""model__n_neighbors"": 23, ""model__weights"": ""uniform""}",4,,,
+6,temperature_regression,XGBoostRegressor,1,4.102674093785778,,"{""learning_rate"": 0.055245405728306586, ""max_depth"": 5, ""n_estimators"": 314}",4,XGBoostRegressor,validation_rmse,3.570861803347709
+6,rain_classification,LogisticRegression,1,,0.5481621486083637,"{""model__C"": 0.01}",4,LogisticRegression,validation_f1,0.6142857142857143
+6,rain_classification,SVM,1,,0.5495586672159339,"{""model__C"": 0.1, ""model__kernel"": ""linear""}",4,,,
+6,rain_classification,XGBoostClassifier,1,,0.46935320613908316,"{""learning_rate"": 0.026844247528777843, ""max_depth"": 10, ""n_estimators"": 472}",4,,,
+7,temperature_regression,LinearRegression,1,,,StandardScaler + LinearRegression,4,,,
+7,temperature_regression,KNNRegressor,1,4.1214611076787175,,"{""model__n_neighbors"": 23, ""model__weights"": ""uniform""}",4,,,
+7,temperature_regression,XGBoostRegressor,1,4.014928323835867,,"{""learning_rate"": 0.055245405728306586, ""max_depth"": 5, ""n_estimators"": 314}",4,XGBoostRegressor,validation_rmse,3.6612455883532977
+7,rain_classification,LogisticRegression,1,,0.5355544683214263,"{""model__C"": 0.01}",4,,,
+7,rain_classification,SVM,1,,0.548524742518203,"{""model__C"": 0.1, ""model__kernel"": ""linear""}",4,SVM,validation_f1,0.6196319018404908
+7,rain_classification,XGBoostClassifier,1,,0.4559736609486914,"{""learning_rate"": 0.026844247528777843, ""max_depth"": 10, ""n_estimators"": 472}",4,,,

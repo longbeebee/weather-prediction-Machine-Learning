@@ -1,0 +1,11 @@
+feature,importance
+temperature,0.48442152
+season,0.17623714
+day_of_year,0.032125372
+pressure_msl,0.027346319
+temp_lag7,0.020569371
+temp_roll_mean_7,0.019552842
+temp_lag1,0.018159788
+wind_speed_10m,0.01794089
+rain_roll_sum_7,0.016254175
+month,0.015610658
