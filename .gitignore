@@ -1,0 +1,21 @@
+# Python and local tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Local production artifacts; publish through an artifact store/MLflow in CI.
+models/seven_day_production/
+*.joblib
+
+# Local environment and generated caches
+.env
+.env.*
+!.env.example
+.matplotlib/
+
+# Generated reports and local databases
+mlruns/
+postgres-data/

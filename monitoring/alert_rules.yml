@@ -1,0 +1,47 @@
+groups:
+  - name: weather-api
+    rules:
+      - alert: WeatherApiDown
+        expr: up{job="weather-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Weather API is unavailable
+      - alert: WeatherApiHighLatency
+        expr: histogram_quantile(0.95, sum(rate(weather_api_prediction_latency_seconds_bucket[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Weather API p95 prediction latency is above 500ms
+      - alert: WeatherModelPerformanceDegraded
+        expr: weather_model_performance_degraded == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Weather model performance is below the configured gate
+          description: Validation or production monitoring requested model review.
+      - alert: WeatherModelDriftDetected
+        expr: weather_model_drift_detected == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Weather model input drift detected
+      - alert: WeatherRetrainingRequired
+        expr: weather_model_retraining_required == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Weather model retraining is required
+      - alert: WeatherModelRainF1Low
+        expr: min by (horizon) (weather_model_rain_f1) < 0.55
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Rain model F1 is below 0.55
+          description: "Rain F1 is below the promotion/monitoring threshold for horizon {{ $labels.horizon }}."

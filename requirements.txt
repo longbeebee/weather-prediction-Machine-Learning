@@ -6,3 +6,10 @@ xgboost
 seaborn
 scipy
 joblib
+fastapi
+uvicorn
+pydantic
+pyyaml
+pytest
+prometheus-client
+mlflow
