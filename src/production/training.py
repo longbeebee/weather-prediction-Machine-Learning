@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
+from src.production.storage import load_feature_snapshot
 
 from src.config import FALLBACK_RAW_DATA_PATH, RAW_DATA_PATH
 from src.data_loader import DataLoader
@@ -24,7 +25,7 @@ from src.split import chronological_split
 CONTRACT_VERSION = "weather-7d-v1"
 
 
-def train_candidates(output_dir: Path, data_path: Path | None = None) -> Path:
+def train_candidates(output_dir: Path, data_path: Path | None = None, features_path: Path | None = None) -> Path:
     """Fit all candidate models and return the candidate manifest path."""
     output_dir = Path(output_dir)
     candidate_dir = output_dir / "candidates"
@@ -33,7 +34,7 @@ def train_candidates(output_dir: Path, data_path: Path | None = None) -> Path:
 
     raw = DataLoader(csv_path).load()
     noon = Preprocessor().preprocess(raw, save=False)
-    base_features = build_base_features(noon)
+    base_features = load_feature_snapshot(features_path) if features_path else build_base_features(noon)
     feature_columns = select_feature_columns(base_features)
     train_base, _, _ = chronological_split(base_features)
 

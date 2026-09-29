@@ -16,11 +16,12 @@ from src.data_loader import DataLoader
 from src.preprocessing import Preprocessor
 from src.production.features import build_base_features, build_horizon_targets, merge_horizon_targets
 from src.production.training import CONTRACT_VERSION
+from src.production.storage import load_feature_snapshot
 from src.seven_day_candidates import rain_probabilities
 from src.split import chronological_split
 
 
-def evaluate_candidates(candidate_manifest: Path, output_dir: Path, data_path: Path | None = None) -> Path:
+def evaluate_candidates(candidate_manifest: Path, output_dir: Path, data_path: Path | None = None, features_path: Path | None = None) -> Path:
     """Select using validation, score once on test, and publish a serving manifest."""
     candidate_manifest = Path(candidate_manifest)
     output_dir = Path(output_dir)
@@ -30,7 +31,7 @@ def evaluate_candidates(candidate_manifest: Path, output_dir: Path, data_path: P
     csv_path = data_path or (RAW_DATA_PATH if RAW_DATA_PATH.exists() else FALLBACK_RAW_DATA_PATH)
     raw = DataLoader(csv_path).load()
     noon = Preprocessor().preprocess(raw, save=False)
-    base_features = build_base_features(noon)
+    base_features = load_feature_snapshot(features_path) if features_path else build_base_features(noon)
     feature_columns = manifest["feature_columns"]
     output_dir.mkdir(parents=True, exist_ok=True)
 

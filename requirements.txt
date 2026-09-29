@@ -13,3 +13,6 @@ pyyaml
 pytest
 prometheus-client
 mlflow
+evidently>=0.7.0,<0.8.0
+boto3
+duckdb

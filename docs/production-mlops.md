@@ -71,6 +71,13 @@ python -m src.production.cli_train \
   --output-dir models/seven_day_production \
   --mlflow-tracking-uri http://localhost:5000
 
+The Airflow training DAG uses the MLflow tracking server and runs a separate
+`register_candidate` task after evaluation. The task registers the selected
+temperature and rain model for each horizon as `weather-7d-*-hN`, assigning the
+`candidate` alias. Only the subsequent promotion gate assigns `champion` and
+preserves the previous version under `previous`. The production manifest and
+`/api/v1/model/info` expose the registry versions for traceability.
+
 python -m src.production.cli_evaluate \
   --candidate-manifest models/seven_day_production/candidate_manifest.json \
   --output-dir models/seven_day_production \
@@ -80,8 +87,31 @@ python -m src.production.cli_evaluate \
 The API exposes Prometheus metrics at `/metrics`. The Compose Prometheus service
 scrapes this endpoint and loads the rules in `monitoring/alert_rules.yml`.
 
-The Airflow monitoring DAG pushes batch model metrics to Pushgateway. Prometheus
-then evaluates alerts for degraded RMSE, low rain F1, drift, and retraining
+The Airflow monitoring DAG first materializes the API prediction log and actual
+observations into one canonical `monitoring_dataset.parquet`, joined by
+`forecast_time`. Performance evaluation, retraining decisions, and monitoring
+archives use this dataset; the old independent `predictions.csv` path is not
+used by the production monitoring flow. The same materialized prediction
+batch is used by Evidently for drift, with one feature snapshot counted per
+API request rather than once per forecast horizon. Reports are written under
+`monitoring/evidently/` and final metrics are pushed to Pushgateway. Prometheus
+then evaluates alerts for degraded RMSE, low rain F1, drift, and retraining.
+Until the actual-observation feed is deployed, keep the monitoring DAG paused;
+it requires `monitoring/actuals.csv` (or an equivalent mounted file) to join
+predictions with observed outcomes.
+
+Training feature snapshots are versioned and uploaded to S3 under
+`S3_FEATURE_PREFIX/feature_version=<sha256>/`. After promotion, the training
+run archives raw input, validation output, feature metadata, model binaries,
+manifests, and evaluation metrics under `weather-7d/runs/<airflow-run>/training`.
+The monitoring run archives predictions, actuals, decisions, and Evidently
+reports under the corresponding monitoring prefix. MLflow artifacts can use
+`MLFLOW_ARTIFACT_ROOT=s3://.../weather-7d/mlflow-artifacts`. The EC2 IAM role
+supplies AWS credentials; no long-lived access key is stored in the repository
+or image. MLflow run metadata is stored in the dedicated PostgreSQL backend
+the shared PostgreSQL container with a separate `mlflow` database;
+`scripts/backup_mlflow_metadata.sh` creates a compressed
+database dump and uploads it to `weather-7d/backups/mlflow/` in S3.
 requirements. API alerts and model alerts therefore use the same Alertmanager
 route.
 
@@ -148,6 +178,11 @@ Endpoints:
 The request must contain at least eight chronological noon observations. This is
 the minimum required to construct the seven-day lag and rolling features without
 using future targets.
+
+The demo data lake uses AWS S3 for durable storage, Parquet for tabular files,
+and DuckDB for queries. Airflow materializes predictions, actuals, and the
+canonical joined monitoring dataset into S3 and writes a small
+`_catalog/datasets.json` manifest; Glue and Athena are not required.
 
 ## Artifact promotion rule
 

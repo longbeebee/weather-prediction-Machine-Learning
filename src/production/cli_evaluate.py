@@ -11,9 +11,10 @@ def main() -> None:
     parser.add_argument("--candidate-manifest", type=Path, default=Path("models/seven_day_production/candidate_manifest.json"))
     parser.add_argument("--output-dir", type=Path, default=Path("models/seven_day_production"))
     parser.add_argument("--data-path", type=Path, default=None)
+    parser.add_argument("--features-path", type=Path, default=None)
     parser.add_argument("--mlflow-tracking-uri", default=None)
     args = parser.parse_args()
-    manifest = evaluate_candidates(args.candidate_manifest, args.output_dir, args.data_path)
+    manifest = evaluate_candidates(args.candidate_manifest, args.output_dir, args.data_path, args.features_path)
     if args.mlflow_tracking_uri:
         from src.production.tracking import log_evaluation_artifacts
         run_id = log_evaluation_artifacts(args.output_dir, args.mlflow_tracking_uri)

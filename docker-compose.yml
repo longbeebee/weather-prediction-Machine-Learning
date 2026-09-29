@@ -1,12 +1,19 @@
 services:
   weather-api:
     build: .
-    environment:
-      SEVEN_DAY_MODEL_MANIFEST: /app/models/seven_day_production/production_manifest.json
     volumes:
       - ./models:/app/models:ro
+      - ./monitoring:/app/monitoring:ro
+      - prediction-logs:/app/monitoring/predictions
     ports:
       - "${API_PORT:-8000}:8000"
+    environment:
+      SEVEN_DAY_MODEL_MANIFEST: /app/models/seven_day_production/production_manifest.json
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PREDICTION_LOG_PATH: /app/monitoring/predictions/api_predictions.jsonl
+    depends_on:
+      mlflow:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"]
       interval: 10s
@@ -48,10 +55,23 @@ services:
       - "${ALERTMANAGER_PORT:-9093}:9093"
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.17.2
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
-    volumes:
-      - mlflow-data:/mlflow
+    build:
+      context: ./mlflow
+    image: weather-mlflow:local
+    depends_on:
+      postgres-mlflow-init:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        case "$${MLFLOW_ARTIFACT_ROOT}" in s3://*) ;; *) echo "MLFLOW_ARTIFACT_ROOT must use s3://" >&2; exit 1 ;; esac;
+        exec mlflow server --host 0.0.0.0 --port 5000
+        --backend-store-uri "$${MLFLOW_BACKEND_STORE_URI}"
+        --default-artifact-root "$${MLFLOW_ARTIFACT_ROOT}"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      MLFLOW_BACKEND_STORE_URI: postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD:-mlflow-db-demo}@postgres-airflow:5432/mlflow
+      MLFLOW_ARTIFACT_ROOT: ${MLFLOW_ARTIFACT_ROOT:?MLFLOW_ARTIFACT_ROOT must be set to an s3:// URI}
     ports:
       - "${MLFLOW_PORT:-5000}:5000"
 
@@ -68,6 +88,19 @@ services:
     depends_on:
       prometheus:
         condition: service_started
+
+  postgres-mlflow-init:
+    image: postgres:16-alpine
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres-airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow-db-demo}
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD:-mlflow-db-demo}
+    volumes:
+      - ./postgres/init/create-mlflow-db.sh:/init/create-mlflow-db.sh:ro
+    entrypoint: ["/bin/sh", "/init/create-mlflow-db.sh"]
 
   postgres-airflow:
     image: postgres:16-alpine
@@ -91,6 +124,8 @@ services:
     depends_on:
       postgres-airflow:
         condition: service_healthy
+      mlflow:
+        condition: service_started
     environment: &airflow-common-env
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:-airflow-db-demo}@postgres-airflow:5432/airflow
@@ -99,10 +134,16 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
       PYTHONPATH: /opt/airflow/project
       ALERTMANAGER_URL: http://alertmanager:9093
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      S3_STORAGE_BUCKET: ${S3_STORAGE_BUCKET:-${S3_FEATURE_BUCKET:-}}
+      S3_FEATURE_BUCKET: ${S3_FEATURE_BUCKET:-${S3_STORAGE_BUCKET:-}}
+      S3_FEATURE_PREFIX: ${S3_FEATURE_PREFIX:-weather-7d/features}
     volumes: &airflow-common-volumes
       - ./airflow/dags:/opt/airflow/dags
       - ./:/opt/airflow/project
       - ./models:/opt/airflow/models
+      - prediction-logs:/opt/airflow/project/monitoring/predictions
       - airflow-logs:/opt/airflow/logs
     command: >-
       bash -c "airflow db migrate &&
@@ -139,7 +180,7 @@ services:
     command: scheduler
 
 volumes:
-  mlflow-data:
   grafana-data:
   airflow-postgres-data:
   airflow-logs:
+  prediction-logs:
