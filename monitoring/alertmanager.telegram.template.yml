@@ -2,11 +2,16 @@ global:
   resolve_timeout: 5m
 
 route:
-  group_by: [alertname, job, horizon]
+  group_by: [alertname, source, event, dag_id, task_id, run_id, job, horizon]
   group_wait: 30s
   group_interval: 1m
   repeat_interval: 4h
   receiver: telegram
+  routes:
+    - matchers: ['source="airflow"', 'event="success"']
+      receiver: airflow_success_telegram
+    - matchers: ['source="airflow"', 'event="failed"']
+      receiver: airflow_failure_telegram
 
 receivers:
   - name: telegram
@@ -21,4 +26,36 @@ receivers:
           Alert: {{ .Labels.alertname }}
           Severity: {{ .Labels.severity }}
           Summary: {{ .Annotations.summary }}
+          {{ end }}
+
+  - name: airflow_success_telegram
+    telegram_configs:
+      - api_url: https://api.telegram.org
+        bot_token: "__TELEGRAM_BOT_TOKEN__"
+        chat_id: __TELEGRAM_CHAT_ID__
+        send_resolved: false
+        message: |
+          [SUCCESS] Airflow MLOps
+          {{ range .Alerts }}
+          DAG: {{ .Labels.dag_id }}
+          Task: {{ .Labels.task_id }}
+          Run: {{ .Labels.run_id }}
+          Summary: {{ .Annotations.summary }}
+          {{ end }}
+
+  - name: airflow_failure_telegram
+    telegram_configs:
+      - api_url: https://api.telegram.org
+        bot_token: "__TELEGRAM_BOT_TOKEN__"
+        chat_id: __TELEGRAM_CHAT_ID__
+        send_resolved: true
+        message: |
+          [{{ .Status | toUpper }}] Airflow MLOps
+          {{ range .Alerts }}
+          DAG: {{ .Labels.dag_id }}
+          Task: {{ .Labels.task_id }}
+          Run: {{ .Labels.run_id }}
+          Severity: {{ .Labels.severity }}
+          Summary: {{ .Annotations.summary }}
+          {{ if .Annotations.description }}Details: {{ .Annotations.description }}{{ end }}
           {{ end }}

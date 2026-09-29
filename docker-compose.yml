@@ -98,6 +98,7 @@ services:
       AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
       PYTHONPATH: /opt/airflow/project
+      ALERTMANAGER_URL: http://alertmanager:9093
     volumes: &airflow-common-volumes
       - ./airflow/dags:/opt/airflow/dags
       - ./:/opt/airflow/project

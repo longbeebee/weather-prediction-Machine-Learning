@@ -105,6 +105,10 @@ docker compose logs alertmanager --tail=100
 curl http://localhost:9093/api/v2/alerts
 ```
 
+Airflow task failures are routed through the same Alertmanager receiver. The DAG
+failure callback posts `AirflowTaskFailed` alerts to the internal Alertmanager
+service, so a failed training or monitoring task produces a Telegram message.
+
 Airflow DAG definitions are in `airflow/dags/`; the training DAG keeps candidate
 training and evaluation as separate sequential tasks, while the monitoring DAG
 checks the published production manifest, calculates performance, and writes a

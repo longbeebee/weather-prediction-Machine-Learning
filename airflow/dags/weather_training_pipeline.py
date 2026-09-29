@@ -4,6 +4,8 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime
 
+from callbacks import airflow_task_failure_callback, airflow_task_success_callback
+
 
 with DAG(
     dag_id="weather_7d_training",
@@ -11,6 +13,10 @@ with DAG(
     schedule="@weekly",
     catchup=False,
     tags=["weather", "mlops"],
+    default_args={
+        "on_failure_callback": airflow_task_failure_callback,
+        "on_success_callback": airflow_task_success_callback,
+    },
 ) as dag:
     ingest = BashOperator(
         task_id="ingest",
