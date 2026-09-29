@@ -5,3 +5,4 @@ xgboost
 scipy
 joblib
 pyyaml
+matplotlib
