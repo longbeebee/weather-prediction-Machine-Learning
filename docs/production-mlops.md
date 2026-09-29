@@ -110,6 +110,25 @@ training and evaluation as separate sequential tasks, while the monitoring DAG
 checks the published production manifest, calculates performance, and writes a
 machine-readable retraining decision from prediction/actual data.
 
+### Airflow runtime
+
+The Compose stack runs Airflow with PostgreSQL metadata storage:
+
+```bash
+docker compose up -d postgres-airflow airflow-init airflow-webserver airflow-scheduler
+docker compose ps airflow-webserver airflow-scheduler postgres-airflow
+```
+
+Open the UI through an SSH tunnel:
+
+```bash
+ssh -i ~/Downloads/your-key.pem -L 8080:localhost:8080 ubuntu@<EC2_PUBLIC_IP>
+```
+
+Then open `http://localhost:8080` and use the `AIRFLOW_ADMIN_USER` and
+`AIRFLOW_ADMIN_PASSWORD` values from `.env`. Enable `weather_7d_training` only
+after the data and model paths are available in the mounted project directory.
+
 Endpoints:
 
 - `GET /health`
