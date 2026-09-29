@@ -112,10 +112,15 @@ machine-readable retraining decision from prediction/actual data.
 
 ### Airflow runtime
 
-The Compose stack runs Airflow with PostgreSQL metadata storage:
+The Compose stack runs Airflow with PostgreSQL metadata storage. Airflow
+dependencies are installed during the custom image build, not every time a
+container starts:
 
 ```bash
-docker compose up -d postgres-airflow airflow-init airflow-webserver airflow-scheduler
+docker compose build airflow-init
+docker compose up -d postgres-airflow
+docker compose run --rm airflow-init
+docker compose up -d airflow-webserver airflow-scheduler
 docker compose ps airflow-webserver airflow-scheduler postgres-airflow
 ```
 
