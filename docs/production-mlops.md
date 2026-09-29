@@ -85,6 +85,26 @@ then evaluates alerts for degraded RMSE, low rain F1, drift, and retraining
 requirements. API alerts and model alerts therefore use the same Alertmanager
 route.
 
+### Telegram notification
+
+Create a Telegram bot with BotFather, add it to the target chat, then set the
+environment variables in `.env` on the EC2 host. Do not commit `.env`:
+
+```bash
+cp .env.example .env
+chmod 600 .env
+# Edit TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env.
+docker compose up -d alertmanager
+```
+
+The Alertmanager Telegram receiver sends both firing and resolved notifications.
+Check delivery with:
+
+```bash
+docker compose logs alertmanager --tail=100
+curl http://localhost:9093/api/v2/alerts
+```
+
 Airflow DAG definitions are in `airflow/dags/`; the training DAG keeps candidate
 training and evaluation as separate sequential tasks, while the monitoring DAG
 checks the published production manifest, calculates performance, and writes a

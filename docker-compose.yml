@@ -35,10 +35,15 @@ services:
       - "${PUSHGATEWAY_PORT:-9091}:9091"
 
   alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.31.1
     volumes:
-      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-    command: --config.file=/etc/alertmanager/alertmanager.yml
+      - ./monitoring/alertmanager.telegram.template.yml:/etc/alertmanager/alertmanager.telegram.template.yml:ro
+      - ./monitoring/alertmanager-entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    entrypoint: ["/bin/sh", "/etc/alertmanager/entrypoint.sh"]
+    command: ["--storage.path=/alertmanager"]
     ports:
       - "${ALERTMANAGER_PORT:-9093}:9093"
 

@@ -9,6 +9,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
+# The production candidate adapter reuses the estimator implementations from
+# the legacy 7-day pipeline module.
+COPY seven_day_pipeline.py ./seven_day_pipeline.py
 
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
 USER appuser

@@ -19,3 +19,7 @@ models/seven_day_production/
 # Generated reports and local databases
 mlruns/
 postgres-data/
+
+# Alertmanager/Telegram secrets
+secrets/*
+!secrets/.gitkeep
