@@ -7,6 +7,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -37,7 +38,7 @@ def collect_actuals(
 ) -> Path:
     """Fetch actual weather for forecast timestamps that have already occurred."""
     times = _forecast_times(predictions_jsonl)
-    current = pd.Timestamp(now or datetime.now()).tz_localize(None)
+    current = pd.Timestamp(now or datetime.now(ZoneInfo(timezone))).tz_localize(None)
     occurred = times[times <= current]
     if len(occurred) == 0:
         raise ValueError("no forecast timestamps have occurred yet; wait until a forecast is verifiable")
