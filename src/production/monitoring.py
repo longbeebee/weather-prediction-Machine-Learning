@@ -102,7 +102,15 @@ def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path
     # machine-readable summary cannot disagree with the HTML report.
     drift_values = find_values(payload, "dataset_drift")
     drifted_counts = find_values(payload, "number_of_drifted_columns")
-    drift_shares = find_values(payload, "share_of_drifted_columns") + find_values(payload, "drift_share")
+    # ``drift_share`` is also used by Evidently as the configured decision
+    # threshold (commonly 0.5).  It must not be treated as the observed share
+    # shown in the UI.  Prefer result fields that explicitly describe the
+    # measured share of drifted columns/features.
+    drift_shares = (
+        find_values(payload, "share_of_drifted_columns")
+        + find_values(payload, "share_of_drifted_features")
+        + find_values(payload, "drifted_columns_share")
+    )
 
     numeric_shares = [float(value) for value in drift_shares if isinstance(value, (int, float))]
     drift_share = max(numeric_shares, default=0.0)
