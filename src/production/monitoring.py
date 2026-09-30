@@ -96,16 +96,28 @@ def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path
                 found.extend(find_values(child, key))
         return found
 
+    # Evidently report schemas differ between versions.  Depending on the
+    # version, the UI's dataset-level result is exposed as
+    # ``dataset_drift`` or as a drifted-column share.  Read both so that the
+    # machine-readable summary cannot disagree with the HTML report.
     drift_values = find_values(payload, "dataset_drift")
     drifted_counts = find_values(payload, "number_of_drifted_columns")
-    drift_detected = any(bool(value) for value in drift_values)
+    drift_shares = find_values(payload, "share_of_drifted_columns") + find_values(payload, "drift_share")
+
+    numeric_shares = [float(value) for value in drift_shares if isinstance(value, (int, float))]
+    drift_share = max(numeric_shares, default=0.0)
+    if drift_share > 1.0:
+        drift_share /= 100.0
     drifted_count = max((int(value) for value in drifted_counts if isinstance(value, (int, float))), default=0)
+    explicit_drift = any(value is True for value in drift_values)
+    drift_detected = explicit_drift or drifted_count > 0 or drift_share > 0.0
     summary = {
         "tool": "evidently",
         "reference_rows": len(reference),
         "current_rows": len(current),
         "feature_count": len(columns),
         "drift_detected": drift_detected,
+        "drift_share": drift_share,
         "drifted_feature_count": drifted_count,
         "html_report": str(html_path),
         "json_report": str(json_path),
