@@ -14,12 +14,20 @@ services:
     depends_on:
       mlflow:
         condition: service_started
+      prediction-logs-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  prediction-logs-init:
+    image: alpine:3.20
+    volumes:
+      - prediction-logs:/data
+    command: ["sh", "-c", "mkdir -p /data && chown -R 10001:10001 /data"]
 
   prometheus:
     image: prom/prometheus:v2.53.0
