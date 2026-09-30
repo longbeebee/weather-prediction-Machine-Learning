@@ -25,7 +25,7 @@ with DAG(
     )
     collect_actuals = BashOperator(
         task_id="collect_actuals_from_open_meteo",
-        bash_command="python -m src.production.cli_actuals --predictions-jsonl /opt/airflow/project/monitoring/predictions/api_predictions.jsonl --output-csv /opt/airflow/run/actuals.csv --metadata-path /opt/airflow/run/actuals_metadata.json --latitude \"$WEATHER_LATITUDE\" --longitude \"$WEATHER_LONGITUDE\" --timezone \"$WEATHER_TIMEZONE\"",
+        bash_command="python -m src.production.cli_actuals --predictions-jsonl /opt/airflow/project/monitoring/predictions/api_predictions.jsonl --output-csv /opt/airflow/run/actuals.csv --metadata-path /opt/airflow/run/actuals_metadata.json",
     )
     materialize_datalake = BashOperator(
         task_id="materialize_datalake",
