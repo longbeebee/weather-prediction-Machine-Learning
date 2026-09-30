@@ -13,12 +13,14 @@ from pathlib import Path
 
 import joblib
 from src.production.storage import load_feature_snapshot
+from src.production.provenance import file_sha256, split_configuration
 
 from src.config import FALLBACK_RAW_DATA_PATH, RAW_DATA_PATH
 from src.data_loader import DataLoader
 from src.preprocessing import Preprocessor
 from src.production.features import build_base_features, build_horizon_targets, merge_horizon_targets, select_feature_columns
 from src.seven_day_candidates import train_rain_candidates, train_temperature_candidates
+from seven_day_pipeline import RANDOM_STATE, SEARCH_ITER
 from src.split import chronological_split
 
 
@@ -64,10 +66,21 @@ def train_candidates(output_dir: Path, data_path: Path | None = None, features_p
         "contract_version": CONTRACT_VERSION,
         "stage": "candidate",
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "random_state": RANDOM_STATE,
         "data_path": str(csv_path),
+        "dataset_sha256": file_sha256(csv_path),
+        "feature_snapshot_sha256": file_sha256(features_path) if features_path else None,
         "data_rows": int(len(raw)),
         "noon_rows": int(len(noon)),
         "train_rows": int(len(train_base)),
+        "split_config": split_configuration(base_features),
+        "search_config": {
+            "search_iter": SEARCH_ITER,
+            "cv_strategy": "TimeSeriesSplit",
+            "cv_splits": 5,
+            "temperature_scoring": "neg_root_mean_squared_error",
+            "rain_scoring": "f1",
+        },
         "feature_columns": feature_columns,
         "horizons": horizons,
     }

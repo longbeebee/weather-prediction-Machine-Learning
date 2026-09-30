@@ -17,6 +17,8 @@ from src.preprocessing import Preprocessor
 from src.production.features import build_base_features, build_horizon_targets, merge_horizon_targets
 from src.production.training import CONTRACT_VERSION
 from src.production.storage import load_feature_snapshot
+from src.production.provenance import file_sha256, split_configuration
+from seven_day_pipeline import RANDOM_STATE, SEARCH_ITER
 from src.seven_day_candidates import rain_probabilities
 from src.split import chronological_split
 
@@ -37,10 +39,20 @@ def evaluate_candidates(candidate_manifest: Path, output_dir: Path, data_path: P
 
     horizons = []
     metrics = []
+    candidate_comparison = []
+    split_rows = []
     for horizon_info in manifest["horizons"]:
         horizon = int(horizon_info["horizon_day"])
         frame = merge_horizon_targets(base_features, build_horizon_targets(noon, horizon))
         _, validation, test = chronological_split(frame)
+        split_rows.append({
+            "horizon_day": horizon,
+            "train_rows": len(frame) - len(validation) - len(test),
+            "validation_rows": len(validation),
+            "test_rows": len(test),
+            "train_start": str(frame["time"].min()),
+            "test_end": str(frame["time"].max()),
+        })
         candidates = {
             "temperature": {name: joblib.load(candidate_manifest.parent / path) for name, path in horizon_info["temperature_models"].items()},
             "rain": {name: joblib.load(candidate_manifest.parent / path) for name, path in horizon_info["rain_models"].items()},
@@ -49,7 +61,9 @@ def evaluate_candidates(candidate_manifest: Path, output_dir: Path, data_path: P
         temp_scores = []
         for name, model in candidates["temperature"].items():
             prediction = model.predict(X_val)
-            temp_scores.append((name, float(np.sqrt(mean_squared_error(validation["horizon_temperature"], prediction)))))
+            rmse = float(np.sqrt(mean_squared_error(validation["horizon_temperature"], prediction)))
+            temp_scores.append((name, rmse))
+            candidate_comparison.append({"horizon_day": horizon, "task": "temperature_regression", "model": name, "validation_rmse": rmse, "selected": False, "hyperparameters": {key: str(value) for key, value in (getattr(model, "best_params_", None) or model.get_params(deep=True)).items()}})
         best_temp = min(temp_scores, key=lambda item: item[1])[0]
 
         rain_scores = []
@@ -65,6 +79,11 @@ def evaluate_candidates(candidate_manifest: Path, output_dir: Path, data_path: P
                     best_f1, best_threshold = float(score), float(threshold)
             rain_scores.append((name, best_f1, best_threshold))
         best_rain, _, rain_threshold = max(rain_scores, key=lambda item: item[1])
+        for name, score, threshold in rain_scores:
+            candidate_comparison.append({"horizon_day": horizon, "task": "rain_classification", "model": name, "validation_f1": score, "decision_threshold": threshold, "selected": False, "hyperparameters": {key: str(value) for key, value in (getattr(candidates["rain"][name], "best_params_", None) or candidates["rain"][name].get_params(deep=True)).items()}})
+        for row in candidate_comparison:
+            if row["horizon_day"] == horizon and ((row["task"] == "temperature_regression" and row["model"] == best_temp) or (row["task"] == "rain_classification" and row["model"] == best_rain)):
+                row["selected"] = True
 
         validation_temp = candidates["temperature"][best_temp].predict(X_val)
         validation_rain_prob = rain_probabilities(candidates["rain"][best_rain], X_val)
@@ -84,7 +103,9 @@ def evaluate_candidates(candidate_manifest: Path, output_dir: Path, data_path: P
         horizons.append({"horizon_day": horizon, "temperature_model": horizon_info["temperature_models"][best_temp], "rain_model": horizon_info["rain_models"][best_rain], "temperature_model_name": best_temp, "rain_model_name": best_rain, "rain_threshold": rain_threshold})
 
     pd.DataFrame(metrics).to_csv(output_dir / "evaluation_metrics.csv", index=False)
-    evaluation = {"contract_version": CONTRACT_VERSION, "stage": "evaluated", "created_at": datetime.now(timezone.utc).isoformat(), "feature_columns": feature_columns, "horizons": horizons, "metrics_path": "evaluation_metrics.csv", "metrics_path_json": "evaluation_metrics.json"}
+    comparison_path = output_dir / "candidate_comparison.json"
+    comparison_path.write_text(json.dumps(candidate_comparison, indent=2, default=str), encoding="utf-8")
+    evaluation = {"contract_version": CONTRACT_VERSION, "stage": "evaluated", "created_at": datetime.now(timezone.utc).isoformat(), "random_state": manifest.get("random_state", RANDOM_STATE), "search_config": manifest.get("search_config", {"search_iter": SEARCH_ITER, "cv_strategy": "TimeSeriesSplit", "cv_splits": 5, "temperature_scoring": "neg_root_mean_squared_error", "rain_scoring": "f1"}), "dataset_sha256": manifest.get("dataset_sha256"), "feature_snapshot_sha256": file_sha256(features_path) if features_path else manifest.get("feature_snapshot_sha256"), "split_config": manifest.get("split_config", split_configuration(base_features)), "split_rows": split_rows, "feature_columns": feature_columns, "horizons": horizons, "metrics_path": "evaluation_metrics.csv", "metrics_path_json": "evaluation_metrics.json", "candidate_comparison_path": comparison_path.name}
     pd.DataFrame(metrics).to_json(output_dir / "evaluation_metrics.json", orient="records", indent=2)
     path = output_dir / "evaluation_manifest.json"
     path.write_text(json.dumps(evaluation, indent=2), encoding="utf-8")

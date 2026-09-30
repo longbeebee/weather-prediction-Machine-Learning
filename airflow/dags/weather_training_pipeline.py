@@ -41,11 +41,11 @@ with DAG(
     )
     register = BashOperator(
         task_id="register_candidate",
-        bash_command="python -m src.production.cli_register --evaluation-manifest /opt/airflow/models/seven_day_production/evaluation_manifest.json --output-dir /opt/airflow/models/seven_day_production --mlflow-tracking-uri $MLFLOW_TRACKING_URI",
+        bash_command="python -m src.production.cli_register --evaluation-manifest /opt/airflow/models/seven_day_production/evaluation_manifest.json --output-dir /opt/airflow/models/seven_day_production --features-path /opt/airflow/run/features.parquet --mlflow-tracking-uri $MLFLOW_TRACKING_URI",
     )
     archive_candidate = BashOperator(
         task_id="archive_candidate_artifacts",
-        bash_command="python -m src.production.cli_archive --path /opt/airflow/run/raw.csv --path /opt/airflow/run/validation.json --path /opt/airflow/run/features.parquet --path /opt/airflow/run/feature_metadata.json --path /opt/airflow/models/seven_day_production/candidates --path /opt/airflow/models/seven_day_production/candidate_manifest.json --path /opt/airflow/models/seven_day_production/evaluation_metrics.csv --path /opt/airflow/models/seven_day_production/evaluation_metrics.json --path /opt/airflow/models/seven_day_production/evaluation_manifest.json --path /opt/airflow/models/seven_day_production/registry_manifest.json --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/{{ ts_nodash }}/training/candidate\" --region \"$AWS_DEFAULT_REGION\"",
+        bash_command="python -m src.production.cli_archive --path /opt/airflow/run/raw.csv --path /opt/airflow/run/validation.json --path /opt/airflow/run/features.parquet --path /opt/airflow/run/feature_metadata.json --path /opt/airflow/models/seven_day_production/candidates --path /opt/airflow/models/seven_day_production/candidate_manifest.json --path /opt/airflow/models/seven_day_production/evaluation_metrics.csv --path /opt/airflow/models/seven_day_production/evaluation_metrics.json --path /opt/airflow/models/seven_day_production/evaluation_manifest.json --path /opt/airflow/models/seven_day_production/candidate_comparison.json --path /opt/airflow/models/seven_day_production/registry_manifest.json --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/{{ ts_nodash }}/training/candidate\" --region \"$AWS_DEFAULT_REGION\"",
     )
     promote = BashOperator(
         task_id="promote_candidate",

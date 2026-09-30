@@ -75,8 +75,16 @@ The Airflow training DAG uses the MLflow tracking server and runs a separate
 `register_candidate` task after evaluation. The task registers the selected
 temperature and rain model for each horizon as `weather-7d-*-hN`, assigning the
 `candidate` alias. Only the subsequent promotion gate assigns `champion` and
-preserves the previous version under `previous`. The production manifest and
+removes `candidate` from the promoted version while preserving the previous
+version under `previous`. Therefore a production version has only the
+`champion` alias, while an unpromoted version has the `candidate` alias. The production manifest and
 `/api/v1/model/info` expose the registry versions for traceability.
+The register run stores dataset/feature hashes, split and search configuration,
+seed, Git commit, package versions, promotion thresholds, candidate comparison
+artifacts, and selected-model metrics. It also creates one parent run with a
+nested child run for each of the 14 horizon/task models. Child runs include
+the selected hyperparameters, MLflow model signature/input example, model size,
+and single-row prediction latency.
 
 python -m src.production.cli_evaluate \
   --candidate-manifest models/seven_day_production/candidate_manifest.json \

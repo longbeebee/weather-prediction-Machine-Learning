@@ -23,7 +23,11 @@ def promote(evaluation_manifest: Path, output_dir: Path, max_rmse: float = 4.0, 
     production["stage"] = "production"
     production["promotion"] = {"max_test_rmse": max_rmse, "min_test_f1": min_f1, "gate": "passed"}
     if registry_manifest and tracking_uri:
-        production["registry"] = promote_registry_aliases(registry_manifest, tracking_uri)
+        production["registry"] = promote_registry_aliases(
+            registry_manifest,
+            tracking_uri,
+            {"max_test_rmse": max_rmse, "min_test_f1": min_f1},
+        )
     path = output_dir / "production_manifest.json"
     path.write_text(json.dumps(production, indent=2), encoding="utf-8")
     shutil.copy2(path, output_dir / "champion_manifest.json")
