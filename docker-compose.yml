@@ -139,6 +139,9 @@ services:
       S3_STORAGE_BUCKET: ${S3_STORAGE_BUCKET:-${S3_FEATURE_BUCKET:-}}
       S3_FEATURE_BUCKET: ${S3_FEATURE_BUCKET:-${S3_STORAGE_BUCKET:-}}
       S3_FEATURE_PREFIX: ${S3_FEATURE_PREFIX:-weather-7d/features}
+      WEATHER_LATITUDE: ${WEATHER_LATITUDE:-21.0285}
+      WEATHER_LONGITUDE: ${WEATHER_LONGITUDE:-105.8542}
+      WEATHER_TIMEZONE: ${WEATHER_TIMEZONE:-Asia/Bangkok}
     volumes: &airflow-common-volumes
       - ./airflow/dags:/opt/airflow/dags
       - ./:/opt/airflow/project

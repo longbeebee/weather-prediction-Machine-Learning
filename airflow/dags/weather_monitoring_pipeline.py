@@ -23,9 +23,13 @@ with DAG(
         task_id="check_production_manifest",
         bash_command="python -c \"import json; p='/opt/airflow/models/seven_day_production/production_manifest.json'; m=json.load(open(p)); assert m['stage']=='production' and len(m['horizons'])==7\"",
     )
+    collect_actuals = BashOperator(
+        task_id="collect_actuals_from_open_meteo",
+        bash_command="python -m src.production.cli_actuals --predictions-jsonl /opt/airflow/project/monitoring/predictions/api_predictions.jsonl --output-csv /opt/airflow/run/actuals.csv --metadata-path /opt/airflow/run/actuals_metadata.json --latitude \"$WEATHER_LATITUDE\" --longitude \"$WEATHER_LONGITUDE\" --timezone \"$WEATHER_TIMEZONE\"",
+    )
     materialize_datalake = BashOperator(
         task_id="materialize_datalake",
-        bash_command="python -m src.production.cli_datalake --predictions-jsonl /opt/airflow/project/monitoring/predictions/api_predictions.jsonl --actuals-csv /opt/airflow/monitoring/actuals.csv --output-dir /opt/airflow/run/datalake --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/bronze/event_date={{ ds }}\" --region \"$AWS_DEFAULT_REGION\"",
+        bash_command="python -m src.production.cli_datalake --predictions-jsonl /opt/airflow/project/monitoring/predictions/api_predictions.jsonl --actuals-csv /opt/airflow/run/actuals.csv --output-dir /opt/airflow/run/datalake --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/bronze/event_date={{ ds }}\" --region \"$AWS_DEFAULT_REGION\"",
     )
     calculate_performance = BashOperator(
         task_id="calculate_performance",
@@ -37,6 +41,6 @@ with DAG(
     )
     archive_monitoring = BashOperator(
         task_id="archive_monitoring_artifacts",
-        bash_command="python -m src.production.cli_archive --path /opt/airflow/run/datalake --path /opt/airflow/monitoring/performance_report.json --path /opt/airflow/monitoring/retraining_decision.json --path /opt/airflow/project/monitoring/evidently --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/{{ ts_nodash }}/monitoring\" --region \"$AWS_DEFAULT_REGION\"",
+        bash_command="python -m src.production.cli_archive --path /opt/airflow/run/datalake --path /opt/airflow/run/actuals_metadata.json --path /opt/airflow/monitoring/performance_report.json --path /opt/airflow/monitoring/retraining_decision.json --path /opt/airflow/project/monitoring/evidently --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/{{ ts_nodash }}/monitoring\" --region \"$AWS_DEFAULT_REGION\"",
     )
-    check_manifest >> materialize_datalake >> calculate_performance >> run_drift_checks >> archive_monitoring
+    check_manifest >> collect_actuals >> materialize_datalake >> calculate_performance >> run_drift_checks >> archive_monitoring
