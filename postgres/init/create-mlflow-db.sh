@@ -3,10 +3,12 @@ set -eu
 
 export PGPASSWORD="${POSTGRES_PASSWORD}"
 psql_base="psql -h "${POSTGRES_HOST}" -U airflow -d postgres -v ON_ERROR_STOP=1"
+escaped_mlflow_password=$(printf '%s' "${MLFLOW_DB_PASSWORD}" | sed "s/'/''/g")
 
 if ! ${psql_base} -tAc "SELECT 1 FROM pg_roles WHERE rolname='mlflow'" | grep -q 1; then
-  ${psql_base} --set=mlflow_password="${MLFLOW_DB_PASSWORD}" \
-    -c "CREATE ROLE mlflow LOGIN PASSWORD :'mlflow_password'"
+  ${psql_base} -c "CREATE ROLE mlflow LOGIN PASSWORD '${escaped_mlflow_password}'"
+else
+  ${psql_base} -c "ALTER ROLE mlflow LOGIN PASSWORD '${escaped_mlflow_password}'"
 fi
 
 if ! ${psql_base} -tAc "SELECT 1 FROM pg_database WHERE datname='mlflow'" | grep -q 1; then
