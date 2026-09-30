@@ -102,11 +102,30 @@ def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path
     # machine-readable summary cannot disagree with the HTML report.
     drift_values = find_values(payload, "dataset_drift")
     drifted_counts = find_values(payload, "number_of_drifted_columns")
+    # Evidently 0.7 serializes this metric as:
+    # {"metric_name": "DriftedColumnsCount(...) ",
+    #  "config": {"drift_share": 0.5},
+    #  "value": {"count": 20.0, "share": 0.8}}
+    # The configured threshold and the observed result are intentionally
+    # separate fields.
+    drift_metric_shares: list[float] = []
+    drift_metric_counts: list[int] = []
+    for metric in payload.get("metrics", []) if isinstance(payload, dict) else []:
+        if not isinstance(metric, dict) or "DriftedColumnsCount" not in str(metric.get("metric_name", "")):
+            continue
+        metric_value = metric.get("value")
+        if isinstance(metric_value, dict):
+            share = metric_value.get("share")
+            count = metric_value.get("count")
+            if isinstance(share, (int, float)):
+                drift_metric_shares.append(float(share))
+            if isinstance(count, (int, float)):
+                drift_metric_counts.append(int(count))
     # ``drift_share`` is also used by Evidently as the configured decision
     # threshold (commonly 0.5).  It must not be treated as the observed share
     # shown in the UI.  Prefer result fields that explicitly describe the
     # measured share of drifted columns/features.
-    drift_shares = (
+    drift_shares = drift_metric_shares + (
         find_values(payload, "share_of_drifted_columns")
         + find_values(payload, "share_of_drifted_features")
         + find_values(payload, "drifted_columns_share")
@@ -116,7 +135,11 @@ def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path
     drift_share = max(numeric_shares, default=0.0)
     if drift_share > 1.0:
         drift_share /= 100.0
-    drifted_count = max((int(value) for value in drifted_counts if isinstance(value, (int, float))), default=0)
+    drifted_count = max(
+        drift_metric_counts
+        + [int(value) for value in drifted_counts if isinstance(value, (int, float))],
+        default=0,
+    )
     explicit_drift = any(value is True for value in drift_values)
     drift_detected = explicit_drift or drifted_count > 0 or drift_share > 0.0
     summary = {
