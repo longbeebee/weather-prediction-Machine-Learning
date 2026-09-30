@@ -16,7 +16,10 @@ def query_s3_parquet(uri: str, sql: str, region: str | None = None):
         connection.execute("LOAD aws")
         selected_region = region or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
         connection.execute(f"CREATE OR REPLACE SECRET weather_s3 (TYPE s3, PROVIDER credential_chain, REGION '{selected_region}')")
-        connection.execute("CREATE OR REPLACE VIEW lake_data AS SELECT * FROM read_parquet(?)", [uri])
+        # DuckDB does not allow prepared parameters in CREATE VIEW. The URI
+        # is escaped as a SQL literal before being interpolated.
+        safe_uri = uri.replace("'", "''")
+        connection.execute(f"CREATE OR REPLACE VIEW lake_data AS SELECT * FROM read_parquet('{safe_uri}')")
         return connection.execute(sql).df()
     finally:
         connection.close()
