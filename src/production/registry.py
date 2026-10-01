@@ -156,8 +156,7 @@ def register_candidate_models(evaluation_manifest: Path, output_dir: Path, track
                 client.set_model_version_tag(model_name, version, "algorithm", selected_algorithm)
                 records.append({"horizon_day": horizon, "task": task, "name": model_name, "version": version, "run_id": child_run_id, "parent_run_id": parent_run_id, "model_uri": model_uri})
 
-    path = output_dir / "registry_manifest.json"
-    path.write_text(json.dumps({
+    registry_payload = {
         "contract_version": manifest["contract_version"],
         "stage": "candidate",
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -165,8 +164,20 @@ def register_candidate_models(evaluation_manifest: Path, output_dir: Path, track
         "experiment_name": experiment_name,
         "parent_run_id": parent_run_id,
         "source_evaluation_manifest": str(evaluation_manifest),
-        "models": records,
-    }, indent=2), encoding="utf-8")
+        "models": [{**item, "alias": "candidate"} for item in records],
+    }
+    path = output_dir / "registry_manifest.json"
+    path.write_text(json.dumps(registry_payload, indent=2), encoding="utf-8")
+
+    # This is the serving contract for a canary bundle.  It deliberately
+    # keeps the evaluated manifest's selected horizon/model metadata while
+    # adding the MLflow candidate aliases used by the canary API.
+    candidate_serving = dict(manifest)
+    candidate_serving["stage"] = "candidate"
+    candidate_serving["registry"] = registry_payload
+    (output_dir / "candidate_serving_manifest.json").write_text(
+        json.dumps(candidate_serving, indent=2), encoding="utf-8"
+    )
     return path
 
 

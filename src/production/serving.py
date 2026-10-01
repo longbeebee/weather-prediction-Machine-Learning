@@ -80,6 +80,7 @@ class ModelService:
     def __init__(self, manifest_path: Path):
         self.manifest_path = manifest_path
         self.model_track = os.getenv("MODEL_TRACK", "champion")
+        self.model_alias = os.getenv("MLFLOW_MODEL_ALIAS", "champion")
         self.manifest: dict | None = None
         self.models: dict[int, dict] = {}
         self.error: str | None = None
@@ -92,8 +93,8 @@ class ModelService:
     def _load(self) -> None:
         try:
             self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-            if self.manifest.get("stage") not in {"production", "evaluated"}:
-                raise ValueError("manifest must be production or evaluated for serving")
+            if self.manifest.get("stage") not in {"production", "candidate", "evaluated"}:
+                raise ValueError("manifest must be production, candidate, or evaluated for serving")
             root = self.manifest_path.parent
             registry_models = {
                 (int(item["horizon_day"]), item["task"]): item
@@ -108,11 +109,12 @@ class ModelService:
                 mlflow.set_tracking_uri(tracking_uri)
             for item in self.manifest["horizons"]:
                 horizon = int(item["horizon_day"])
-                temperature_model = joblib.load(root / item["temperature_model"])
-                rain_model = joblib.load(root / item["rain_model"])
                 if registry_models:
-                    temperature_model = mlflow.sklearn.load_model(f"models:/{registry_models[(horizon, 'temperature')]['name']}@champion")
-                    rain_model = mlflow.sklearn.load_model(f"models:/{registry_models[(horizon, 'rain')]['name']}@champion")
+                    temperature_model = mlflow.sklearn.load_model(f"models:/{registry_models[(horizon, 'temperature')]['name']}@{self.model_alias}")
+                    rain_model = mlflow.sklearn.load_model(f"models:/{registry_models[(horizon, 'rain')]['name']}@{self.model_alias}")
+                else:
+                    temperature_model = joblib.load(root / item["temperature_model"])
+                    rain_model = joblib.load(root / item["rain_model"])
                 self.models[horizon] = {
                     "temperature": temperature_model,
                     "rain": rain_model,
@@ -180,6 +182,7 @@ def create_app(manifest_path: Path | None = None) -> FastAPI:
             "contract_version": service.manifest["contract_version"],
             "model_track": service.model_track,
             "manifest_stage": service.manifest.get("stage"),
+            "model_alias": service.model_alias,
             "created_at": service.manifest["created_at"],
             "horizons": 7,
             "registry": service.manifest.get("registry", {}),

@@ -35,8 +35,9 @@ services:
     ports:
       - "${API_CANARY_PORT:-8001}:8000"
     environment:
-      SEVEN_DAY_MODEL_MANIFEST: /app/models/seven_day_production/evaluation_manifest.json
+      SEVEN_DAY_MODEL_MANIFEST: /app/models/seven_day_production/candidate_serving_manifest.json
       MODEL_TRACK: canary
+      MLFLOW_MODEL_ALIAS: candidate
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PREDICTION_LOG_PATH: /app/monitoring/predictions/api_predictions_canary.jsonl
     depends_on:
