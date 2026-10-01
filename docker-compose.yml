@@ -1,6 +1,7 @@
 services:
   weather-api:
     build: .
+    image: ${WEATHER_API_IMAGE:-weather-api:local}
     volumes:
       - ./models:/app/models:ro
       - ./monitoring:/app/monitoring:ro
@@ -9,8 +10,35 @@ services:
       - "${API_PORT:-8000}:8000"
     environment:
       SEVEN_DAY_MODEL_MANIFEST: /app/models/seven_day_production/production_manifest.json
+      MODEL_TRACK: champion
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PREDICTION_LOG_PATH: /app/monitoring/predictions/api_predictions.jsonl
+    depends_on:
+      mlflow:
+        condition: service_started
+      prediction-logs-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  weather-api-canary:
+    build: .
+    image: ${WEATHER_API_IMAGE:-weather-api:local}
+    volumes:
+      - ./models:/app/models:ro
+      - ./monitoring:/app/monitoring:ro
+      - prediction-logs:/app/monitoring/predictions
+    ports:
+      - "${API_CANARY_PORT:-8001}:8000"
+    environment:
+      SEVEN_DAY_MODEL_MANIFEST: /app/models/seven_day_production/evaluation_manifest.json
+      MODEL_TRACK: canary
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PREDICTION_LOG_PATH: /app/monitoring/predictions/api_predictions_canary.jsonl
     depends_on:
       mlflow:
         condition: service_started

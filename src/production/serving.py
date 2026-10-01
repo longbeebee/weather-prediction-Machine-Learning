@@ -22,9 +22,9 @@ from src.utils import weather_level
 from src.seven_day_candidates import rain_probabilities
 
 
-REQUESTS = Counter("weather_api_requests_total", "Total API requests", ["endpoint", "status"])
-PREDICTION_LATENCY = Histogram("weather_api_prediction_latency_seconds", "Prediction latency in seconds")
-MODEL_READY = Gauge("weather_api_model_ready", "Whether the production model bundle is ready")
+REQUESTS = Counter("weather_api_requests_total", "Total API requests", ["endpoint", "status", "model_track"])
+PREDICTION_LATENCY = Histogram("weather_api_prediction_latency_seconds", "Prediction latency in seconds", ["model_track"])
+MODEL_READY = Gauge("weather_api_model_ready", "Whether the model bundle is ready", ["model_track"])
 
 
 class PredictionLogger:
@@ -71,6 +71,7 @@ class ForecastItem(BaseModel):
 class ForecastResponse(BaseModel):
     request_id: str
     contract_version: str
+    model_track: str
     model_created_at: str
     forecast: list[ForecastItem]
 
@@ -78,6 +79,7 @@ class ForecastResponse(BaseModel):
 class ModelService:
     def __init__(self, manifest_path: Path):
         self.manifest_path = manifest_path
+        self.model_track = os.getenv("MODEL_TRACK", "champion")
         self.manifest: dict | None = None
         self.models: dict[int, dict] = {}
         self.error: str | None = None
@@ -90,8 +92,8 @@ class ModelService:
     def _load(self) -> None:
         try:
             self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-            if self.manifest.get("stage") != "production":
-                raise ValueError("manifest is not a production manifest")
+            if self.manifest.get("stage") not in {"production", "evaluated"}:
+                raise ValueError("manifest must be production or evaluated for serving")
             root = self.manifest_path.parent
             registry_models = {
                 (int(item["horizon_day"]), item["task"]): item
@@ -122,7 +124,7 @@ class ModelService:
             self.error = str(exc)
             self.manifest = None
             self.models = {}
-        MODEL_READY.set(1 if self.ready else 0)
+        MODEL_READY.labels(self.model_track).set(1 if self.ready else 0)
 
     def predict(self, observations: list[WeatherObservation]) -> list[ForecastItem]:
         forecasts, _ = self.predict_with_features(observations)
@@ -176,6 +178,8 @@ def create_app(manifest_path: Path | None = None) -> FastAPI:
             raise HTTPException(status_code=503, detail="production models are not ready")
         return {
             "contract_version": service.manifest["contract_version"],
+            "model_track": service.model_track,
+            "manifest_stage": service.manifest.get("stage"),
             "created_at": service.manifest["created_at"],
             "horizons": 7,
             "registry": service.manifest.get("registry", {}),
@@ -190,26 +194,27 @@ def create_app(manifest_path: Path | None = None) -> FastAPI:
         request_id = str(uuid.uuid4())
         started = time.perf_counter()
         try:
-            with PREDICTION_LATENCY.time():
+            with PREDICTION_LATENCY.labels(service.model_track).time():
                 forecasts, features = service.predict_with_features(request.observations)
         except ValueError as exc:
-            REQUESTS.labels("predict", "422").inc()
+            REQUESTS.labels("predict", "422", service.model_track).inc()
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except RuntimeError as exc:
-            REQUESTS.labels("predict", "503").inc()
+            REQUESTS.labels("predict", "503", service.model_track).inc()
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        REQUESTS.labels("predict", "200").inc()
+        REQUESTS.labels("predict", "200", service.model_track).inc()
         _ = time.perf_counter() - started
         prediction_logger.append({
             "request_id": request_id,
             "observed_at": datetime.now(timezone.utc).isoformat(),
             "contract_version": service.manifest["contract_version"],
+            "model_track": service.model_track,
             "model_created_at": service.manifest["created_at"],
             "observation_time": request.observations[-1].time.isoformat(),
             "feature_values": {column: float(features.iloc[0][column]) for column in features.columns},
             "forecast": [item.model_dump() for item in forecasts],
         })
-        return ForecastResponse(request_id=request_id, contract_version=service.manifest["contract_version"], model_created_at=service.manifest["created_at"], forecast=forecasts)
+        return ForecastResponse(request_id=request_id, contract_version=service.manifest["contract_version"], model_track=service.model_track, model_created_at=service.manifest["created_at"], forecast=forecasts)
 
     return app
 

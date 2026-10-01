@@ -47,12 +47,8 @@ with DAG(
         task_id="archive_candidate_artifacts",
         bash_command="python -m src.production.cli_archive --path /opt/airflow/run/raw.csv --path /opt/airflow/run/validation.json --path /opt/airflow/run/features.parquet --path /opt/airflow/run/feature_metadata.json --path /opt/airflow/models/seven_day_production/candidates --path /opt/airflow/models/seven_day_production/candidate_manifest.json --path /opt/airflow/models/seven_day_production/evaluation_metrics.csv --path /opt/airflow/models/seven_day_production/evaluation_metrics.json --path /opt/airflow/models/seven_day_production/evaluation_manifest.json --path /opt/airflow/models/seven_day_production/candidate_comparison.json --path /opt/airflow/models/seven_day_production/registry_manifest.json --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/{{ ts_nodash }}/training/candidate\" --region \"$AWS_DEFAULT_REGION\"",
     )
-    promote = BashOperator(
-        task_id="promote_candidate",
-        bash_command="python -m src.production.cli_promote --evaluation-manifest /opt/airflow/models/seven_day_production/evaluation_manifest.json --registry-manifest /opt/airflow/models/seven_day_production/registry_manifest.json --output-dir /opt/airflow/models/seven_day_production --mlflow-tracking-uri $MLFLOW_TRACKING_URI",
-    )
-    archive_production = BashOperator(
-        task_id="archive_production_artifacts",
-        bash_command="python -m src.production.cli_archive --path /opt/airflow/models/seven_day_production/production_manifest.json --path /opt/airflow/models/seven_day_production/champion_manifest.json --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/{{ ts_nodash }}/training/production\" --region \"$AWS_DEFAULT_REGION\"",
-    )
-    ingest >> validate >> build_features >> train >> evaluate >> register >> archive_candidate >> promote >> archive_production
+    # Promotion is intentionally outside the scheduled training DAG.  The
+    # evaluated candidate must first be deployed behind the ALB and observed
+    # as canary traffic.  Jenkins' parameterized promotion job performs the
+    # final candidate -> champion transition after that review.
+    ingest >> validate >> build_features >> train >> evaluate >> register >> archive_candidate
