@@ -9,6 +9,7 @@ pipeline {
         )
         string(name: 'CHAMPION_WEIGHT', defaultValue: '90', description: 'ALB weight for champion')
         string(name: 'CANDIDATE_WEIGHT', defaultValue: '10', description: 'ALB weight for candidate')
+        string(name: 'CANDIDATE_RELEASE_ID', defaultValue: '', description: 'MLflow parent run/release id to deploy or promote')
     }
 
     environment {
@@ -35,6 +36,9 @@ pipeline {
                     }
                     env.EFFECTIVE_CHAMPION_WEIGHT = params.CANARY_ACTION == 'ROLLBACK' ? '100' : params.CHAMPION_WEIGHT
                     env.EFFECTIVE_CANDIDATE_WEIGHT = params.CANARY_ACTION == 'ROLLBACK' ? '0' : params.CANDIDATE_WEIGHT
+                    if (['DEPLOY_CANARY', 'PROMOTE'].contains(params.CANARY_ACTION) && !(params.CANDIDATE_RELEASE_ID ==~ /^[A-Za-z0-9_-]+$/)) {
+                        error('CANDIDATE_RELEASE_ID is required and must contain only letters, numbers, underscores, or hyphens')
+                    }
                 }
             }
         }
@@ -61,7 +65,7 @@ pipeline {
                 sshagent(credentials: ['weather-app-ssh-key']) {
                     sh '''
                         ssh -o StrictHostKeyChecking=accept-new "$APP_USER@$APP_HOST" \\
-                          "cd '$APP_DIR' && aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '$ECR_REGISTRY' && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' docker compose pull weather-api-canary && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' docker compose up -d --no-build weather-api-canary && curl -fsS http://localhost:8001/ready"
+                          "cd '$APP_DIR' && aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '$ECR_REGISTRY' && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' CANARY_MODEL_MANIFEST='/app/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/candidate_serving_manifest.json' docker compose pull weather-api-canary && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' CANARY_MODEL_MANIFEST='/app/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/candidate_serving_manifest.json' docker compose up -d --no-build weather-api-canary && curl -fsS http://localhost:8001/ready"
                     '''
                 }
             }
@@ -94,7 +98,7 @@ pipeline {
                 sshagent(credentials: ['weather-app-ssh-key']) {
                     sh '''
                         ssh -o StrictHostKeyChecking=accept-new "$APP_USER@$APP_HOST" \\
-                          "cd '$APP_DIR' && docker compose exec -T airflow-scheduler python -m src.production.cli_promote --evaluation-manifest /opt/airflow/models/seven_day_production/evaluation_manifest.json --registry-manifest /opt/airflow/models/seven_day_production/registry_manifest.json --output-dir /opt/airflow/models/seven_day_production --mlflow-tracking-uri http://mlflow:5000 && docker compose exec -T airflow-scheduler python -m src.production.cli_archive --path /opt/airflow/models/seven_day_production/production_manifest.json --path /opt/airflow/models/seven_day_production/champion_manifest.json --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/jenkins-${BUILD_NUMBER}/training/production\" --region \"$AWS_REGION\" && docker compose up -d weather-api"
+                          "cd '$APP_DIR' && docker compose exec -T airflow-scheduler python -m src.production.cli_promote --evaluation-manifest /opt/airflow/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/evaluation_manifest.json --registry-manifest /opt/airflow/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/registry_manifest.json --output-dir /opt/airflow/models/seven_day_production --mlflow-tracking-uri http://mlflow:5000 && docker compose exec -T airflow-scheduler python -m src.production.cli_archive --path /opt/airflow/models/seven_day_production/production_manifest.json --path /opt/airflow/models/seven_day_production/champion_manifest.json --s3-bucket \"$S3_STORAGE_BUCKET\" --s3-prefix \"weather-7d/runs/jenkins-${BUILD_NUMBER}/training/production/release=$CANDIDATE_RELEASE_ID\" --region \"$AWS_REGION\" && docker compose up -d weather-api"
                     '''
                 }
             }

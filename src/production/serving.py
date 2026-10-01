@@ -110,8 +110,8 @@ class ModelService:
             for item in self.manifest["horizons"]:
                 horizon = int(item["horizon_day"])
                 if registry_models:
-                    temperature_model = mlflow.sklearn.load_model(f"models:/{registry_models[(horizon, 'temperature')]['name']}@{self.model_alias}")
-                    rain_model = mlflow.sklearn.load_model(f"models:/{registry_models[(horizon, 'rain')]['name']}@{self.model_alias}")
+                    temperature_model = mlflow.sklearn.load_model(self._registry_uri(registry_models[(horizon, "temperature")]))
+                    rain_model = mlflow.sklearn.load_model(self._registry_uri(registry_models[(horizon, "rain")]))
                 else:
                     temperature_model = joblib.load(root / item["temperature_model"])
                     rain_model = joblib.load(root / item["rain_model"])
@@ -127,6 +127,14 @@ class ModelService:
             self.manifest = None
             self.models = {}
         MODEL_READY.labels(self.model_track).set(1 if self.ready else 0)
+
+    def _registry_uri(self, item: dict) -> str:
+        """Build a stable MLflow URI, pinning a registered version when present."""
+        name = item["name"]
+        version = item.get("version")
+        if version is not None:
+            return f"models:/{name}/{version}"
+        return f"models:/{name}@{self.model_alias}"
 
     def predict(self, observations: list[WeatherObservation]) -> list[ForecastItem]:
         forecasts, _ = self.predict_with_features(observations)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -166,6 +167,8 @@ def register_candidate_models(evaluation_manifest: Path, output_dir: Path, track
         "source_evaluation_manifest": str(evaluation_manifest),
         "models": [{**item, "alias": "candidate"} for item in records],
     }
+    release_id = parent_run_id
+    registry_payload["release_id"] = release_id
     path = output_dir / "registry_manifest.json"
     path.write_text(json.dumps(registry_payload, indent=2), encoding="utf-8")
 
@@ -178,6 +181,33 @@ def register_candidate_models(evaluation_manifest: Path, output_dir: Path, track
     (output_dir / "candidate_serving_manifest.json").write_text(
         json.dumps(candidate_serving, indent=2), encoding="utf-8"
     )
+
+    # Keep every candidate release immutable.  A later retraining run may
+    # update the convenience files at output_dir, but it must not overwrite
+    # the manifests used by an active canary or a pending promotion.
+    release_dir = output_dir / "releases" / release_id
+    release_dir.mkdir(parents=True, exist_ok=True)
+    for filename in (
+        "evaluation_manifest.json",
+        "registry_manifest.json",
+        "candidate_serving_manifest.json",
+        "evaluation_metrics.json",
+        "evaluation_metrics.csv",
+        "candidate_comparison.json",
+    ):
+        source = output_dir / filename
+        if not source.exists():
+            raise FileNotFoundError(f"candidate release artifact is missing: {source}")
+        shutil.copy2(source, release_dir / filename)
+    (release_dir / "release_manifest.json").write_text(json.dumps({
+        "release_id": release_id,
+        "parent_run_id": parent_run_id,
+        "stage": "candidate",
+        "created_at": registry_payload["created_at"],
+        "manifest": "candidate_serving_manifest.json",
+        "registry_manifest": "registry_manifest.json",
+        "evaluation_manifest": "evaluation_manifest.json",
+    }, indent=2), encoding="utf-8")
     return path
 
 
