@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+        skipDefaultCheckout(false)
+    }
+
+    environment {
+        AWS_REGION = credentials('aws-region')
+        APP_HOST = credentials('weather-app-host')
+        APP_USER = credentials('weather-app-user')
+        APP_DIR = credentials('weather-app-dir')
+        ECR_REGISTRY = credentials('weather-ecr-registry')
+        ECR_REPOSITORY = credentials('weather-ecr-repository')
+    }
+
+    stages {
+        stage('Build and test API image') {
+            steps {
+                sh '''
+                    set -e
+                    aws ecr get-login-password --region "$AWS_REGION" \\
+                      | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+                    docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT" .
+                    docker run --rm \\
+                      -e PYTHONPATH=/workspace \\
+                      -v "$WORKSPACE:/workspace" \\
+                      -w /workspace \\
+                      "$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT" \\
+                      pytest -q
+                '''
+            }
+        }
+
+        stage('Push API image to ECR') {
+            steps {
+                sh '''
+                    docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT"
+                '''
+            }
+        }
+
+        stage('Deploy application EC2') {
+            steps {
+                sshagent(credentials: ['weather-app-ssh-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=accept-new "$APP_USER@$APP_HOST" \\
+                          "cd '$APP_DIR' && git pull --ff-only origin main && AWS_REGION='$AWS_REGION' ECR_REGISTRY='$ECR_REGISTRY' ECR_REPOSITORY='$ECR_REPOSITORY' IMAGE_TAG='$GIT_COMMIT' bash scripts/deploy_application.sh"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Application CD completed for commit ${env.GIT_COMMIT}"
+        }
+    }
+}

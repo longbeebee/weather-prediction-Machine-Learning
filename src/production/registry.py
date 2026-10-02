@@ -211,8 +211,33 @@ def register_candidate_models(evaluation_manifest: Path, output_dir: Path, track
     return path
 
 
+def _alias_version(client, model_name: str, alias: str):
+    try:
+        return client.get_model_version_by_alias(model_name, alias)
+    except Exception:
+        return None
+
+
+def _promote_model_alias(client, model_name: str, new_version: str) -> None:
+    """Promote one version while keeping champion/previous aliases distinct."""
+    current = _alias_version(client, model_name, "champion")
+    previous = _alias_version(client, model_name, "previous")
+
+    if current is None:
+        client.set_registered_model_alias(model_name, "champion", new_version)
+    elif str(current.version) != new_version:
+        client.set_registered_model_alias(model_name, "previous", str(current.version))
+        client.set_registered_model_alias(model_name, "champion", new_version)
+    elif previous is not None and str(previous.version) == new_version:
+        # Repair the invalid state created by older, non-idempotent promotion
+        # logic. A version must never be both champion and previous.
+        client.delete_registered_model_alias(model_name, "previous")
+
+    client.delete_registered_model_alias(model_name, "candidate")
+
+
 def promote_registry_aliases(registry_manifest: Path, tracking_uri: str, promotion_thresholds: dict[str, float] | None = None) -> dict:
-    """Move candidate to champion and preserve the previous champion alias."""
+    """Move candidate to champion and preserve a distinct previous champion."""
     _, MlflowClient = _mlflow_modules()
     payload = json.loads(Path(registry_manifest).read_text(encoding="utf-8"))
     client = MlflowClient(tracking_uri=tracking_uri)
@@ -224,15 +249,6 @@ def promote_registry_aliases(registry_manifest: Path, tracking_uri: str, promoti
     promoted = []
     for item in payload["models"]:
         name = item["name"]
-        try:
-            current = client.get_model_version_by_alias(name, "champion")
-            client.set_registered_model_alias(name, "previous", str(current.version))
-        except Exception:
-            pass
-        client.set_registered_model_alias(name, "champion", str(item["version"]))
-        # A promoted version must not retain the candidate alias. The
-        # candidate alias represents the version waiting for promotion;
-        # champion is the only production alias.
-        client.delete_registered_model_alias(name, "candidate")
+        _promote_model_alias(client, name, str(item["version"]))
         promoted.append({**item, "alias": "champion"})
     return {"stage": "production", "models": promoted}
