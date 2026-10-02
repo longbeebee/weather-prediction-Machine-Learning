@@ -65,7 +65,7 @@ pipeline {
                 sshagent(credentials: ['weather-app-ssh-key']) {
                     sh '''
                         ssh -o StrictHostKeyChecking=accept-new "$APP_USER@$APP_HOST" \\
-                          "cd '$APP_DIR' && aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '$ECR_REGISTRY' && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' CANARY_MODEL_MANIFEST='/app/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/candidate_serving_manifest.json' docker compose pull weather-api-canary && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' CANARY_MODEL_MANIFEST='/app/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/candidate_serving_manifest.json' docker compose up -d --no-build weather-api-canary && curl -fsS http://localhost:8001/ready"
+                          "cd '$APP_DIR' && aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '$ECR_REGISTRY' && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' CANARY_MODEL_MANIFEST='/app/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/candidate_serving_manifest.json' docker compose pull weather-api-canary && WEATHER_API_IMAGE='$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT' CANARY_MODEL_MANIFEST='/app/models/seven_day_production/releases/$CANDIDATE_RELEASE_ID/candidate_serving_manifest.json' docker compose up -d --no-build weather-api-canary && for attempt in \$(seq 1 30); do if curl -fsS http://localhost:8001/ready; then exit 0; fi; sleep 2; done; docker compose logs --tail=200 weather-api-canary; exit 1"
                     '''
                 }
             }
