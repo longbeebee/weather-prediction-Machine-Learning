@@ -15,12 +15,14 @@ import pandas as pd
 OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 
-def _forecast_times(predictions_jsonl: Path) -> pd.DatetimeIndex:
+def _forecast_times(predictions_jsonl: Path, release_id: str | None = None) -> pd.DatetimeIndex:
     values = []
     for line in Path(predictions_jsonl).read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         payload = json.loads(line)
+        if release_id is not None and payload.get("model_release_id") != release_id:
+            continue
         values.extend(item["forecast_time"] for item in payload.get("forecast", []))
     if not values:
         raise ValueError("prediction log contains no forecast_time values")
@@ -35,9 +37,10 @@ def collect_actuals(
     longitude: float,
     timezone: str = "Asia/Bangkok",
     now: datetime | None = None,
+    release_id: str | None = None,
 ) -> Path:
     """Fetch actual weather for forecast timestamps that have already occurred."""
-    times = _forecast_times(predictions_jsonl)
+    times = _forecast_times(predictions_jsonl, release_id=release_id)
     current = pd.Timestamp(now or datetime.now(ZoneInfo(timezone))).tz_localize(None)
     occurred = times[times <= current]
     if len(occurred) == 0:

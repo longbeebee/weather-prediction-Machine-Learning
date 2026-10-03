@@ -20,8 +20,9 @@ def main() -> None:
     parser.add_argument("--latitude", type=float, default=_env_float("WEATHER_LATITUDE", 21.0285))
     parser.add_argument("--longitude", type=float, default=_env_float("WEATHER_LONGITUDE", 105.8542))
     parser.add_argument("--timezone", default=os.getenv("WEATHER_TIMEZONE") or "Asia/Bangkok")
+    parser.add_argument("--release-id", default=None)
     args = parser.parse_args()
-    print(collect_actuals(args.predictions_jsonl, args.output_csv, args.metadata_path, args.latitude, args.longitude, args.timezone))
+    print(collect_actuals(args.predictions_jsonl, args.output_csv, args.metadata_path, args.latitude, args.longitude, args.timezone, release_id=args.release_id))
 
 
 if __name__ == "__main__":

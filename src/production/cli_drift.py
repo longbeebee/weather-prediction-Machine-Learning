@@ -15,8 +15,9 @@ def main() -> None:
     parser.add_argument("--performance-report", type=Path, required=True)
     parser.add_argument("--decision", type=Path, required=True)
     parser.add_argument("--pushgateway-url", default=None)
+    parser.add_argument("--release-id", default=None)
     args = parser.parse_args()
-    summary = run_evidently_drift_report(args.data_path, args.html_report, args.json_report, args.current_features_path)
+    summary = run_evidently_drift_report(args.data_path, args.html_report, args.json_report, args.current_features_path, release_id=args.release_id)
     apply_drift_result(args.performance_report, summary, args.decision, args.pushgateway_url)
     print(summary)
 

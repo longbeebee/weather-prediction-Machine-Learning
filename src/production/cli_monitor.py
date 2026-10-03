@@ -12,8 +12,9 @@ def main() -> None:
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--decision", type=Path, required=True)
     parser.add_argument("--pushgateway-url", default=None)
+    parser.add_argument("--release-id", default=None)
     args = parser.parse_args()
-    report = monitor_predictions(args.dataset, args.report)
+    report = monitor_predictions(args.dataset, args.report, release_id=args.release_id)
     print(decide_retraining(report, args.decision))
     if args.pushgateway_url:
         from src.production.monitoring import push_monitoring_metrics

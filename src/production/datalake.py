@@ -10,7 +10,7 @@ import pandas as pd
 from src.production.storage import upload_paths, write_parquet, write_s3_catalog
 
 
-def prediction_log_frame(path: Path) -> pd.DataFrame:
+def prediction_log_frame(path: Path, release_id: str | None = None) -> pd.DataFrame:
     rows = []
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -20,6 +20,7 @@ def prediction_log_frame(path: Path) -> pd.DataFrame:
         for forecast in payload.get("forecast", []):
             row = {
                 "request_id": payload["request_id"],
+                "model_release_id": payload.get("model_release_id", payload.get("release_id")),
                 "observed_at": payload["observed_at"],
                 "contract_version": payload["contract_version"],
                 "model_created_at": payload["model_created_at"],
@@ -40,7 +41,9 @@ def prediction_log_frame(path: Path) -> pd.DataFrame:
         frame["forecast_time"] = pd.to_datetime(frame["forecast_time"], errors="coerce")
         frame["observed_at"] = pd.to_datetime(frame["observed_at"], errors="coerce")
         frame["observation_time"] = pd.to_datetime(frame["observation_time"], errors="coerce")
-    return frame
+        if release_id is not None:
+            frame = frame[frame["model_release_id"] == release_id].copy()
+    return frame.reset_index(drop=True)
 
 
 def normalize_actuals(actuals: pd.DataFrame) -> pd.DataFrame:
@@ -77,9 +80,9 @@ def normalize_actuals(actuals: pd.DataFrame) -> pd.DataFrame:
     return frame[["forecast_time", "actual_temperature", "actual_rain"]].drop_duplicates("forecast_time")
 
 
-def materialize_monitoring_data(predictions_jsonl: Path, actuals_csv: Path, output_dir: Path, bucket: str, prefix: str, region: str | None = None) -> dict:
+def materialize_monitoring_data(predictions_jsonl: Path, actuals_csv: Path, output_dir: Path, bucket: str, prefix: str, region: str | None = None, release_id: str | None = None) -> dict:
     output_dir = Path(output_dir)
-    predictions = prediction_log_frame(predictions_jsonl)
+    predictions = prediction_log_frame(predictions_jsonl, release_id=release_id)
     if predictions.empty:
         raise ValueError("prediction log is empty; call the production API before materializing the data lake")
     actuals = normalize_actuals(pd.read_csv(actuals_csv))

@@ -51,3 +51,31 @@ def test_monitoring_uses_canonical_joined_dataset(tmp_path):
     payload = report.read_text(encoding="utf-8")
     assert '"horizon_day": 1' in payload
     assert '"performance_degraded": false' in payload
+
+
+def test_prediction_log_can_be_scoped_to_model_release(tmp_path):
+    log = tmp_path / "api_predictions.jsonl"
+    rows = []
+    for release_id, request_id in (("old-release", "old"), ("new-release", "new")):
+        rows.append(json.dumps({
+            "request_id": request_id,
+            "model_release_id": release_id,
+            "observed_at": "2026-01-01T12:00:00+00:00",
+            "contract_version": "weather-7d-v1",
+            "model_created_at": "2026-01-01T00:00:00+00:00",
+            "observation_time": "2026-01-01T12:00:00",
+            "feature_values": {"temperature": 20.0},
+            "forecast": [{
+                "horizon_day": 1,
+                "forecast_time": "2026-01-02T12:00:00",
+                "predicted_temperature": 21.0,
+                "predicted_rain": False,
+                "predicted_rain_probability": 0.1,
+            }],
+        }))
+    log.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    predictions = prediction_log_frame(log, release_id="new-release")
+
+    assert len(predictions) == 1
+    assert predictions.loc[0, "model_release_id"] == "new-release"

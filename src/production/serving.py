@@ -25,6 +25,11 @@ from src.seven_day_candidates import rain_probabilities
 REQUESTS = Counter("weather_api_requests_total", "Total API requests", ["endpoint", "status", "model_track"])
 PREDICTION_LATENCY = Histogram("weather_api_prediction_latency_seconds", "Prediction latency in seconds", ["model_track"])
 MODEL_READY = Gauge("weather_api_model_ready", "Whether the model bundle is ready", ["model_track"])
+MODEL_RELEASE_INFO = Gauge(
+    "weather_model_release_info",
+    "Active model release metadata",
+    ["model_track", "release_id"],
+)
 
 
 class PredictionLogger:
@@ -72,6 +77,7 @@ class ForecastResponse(BaseModel):
     request_id: str
     contract_version: str
     model_track: str
+    model_release_id: str
     model_created_at: str
     forecast: list[ForecastItem]
 
@@ -81,6 +87,7 @@ class ModelService:
         self.manifest_path = manifest_path
         self.model_track = os.getenv("MODEL_TRACK", "champion")
         self.model_alias = os.getenv("MLFLOW_MODEL_ALIAS", "champion")
+        self.release_id = os.getenv("MODEL_RELEASE_ID", "unknown")
         self.manifest: dict | None = None
         self.models: dict[int, dict] = {}
         self.error: str | None = None
@@ -93,6 +100,12 @@ class ModelService:
     def _load(self) -> None:
         try:
             self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+            registry = self.manifest.get("registry", {})
+            self.release_id = str(
+                self.manifest.get("release_id")
+                or registry.get("release_id")
+                or os.getenv("MODEL_RELEASE_ID", "unknown")
+            )
             if self.manifest.get("stage") not in {"production", "candidate", "evaluated"}:
                 raise ValueError("manifest must be production, candidate, or evaluated for serving")
             root = self.manifest_path.parent
@@ -127,6 +140,7 @@ class ModelService:
             self.manifest = None
             self.models = {}
         MODEL_READY.labels(self.model_track).set(1 if self.ready else 0)
+        MODEL_RELEASE_INFO.labels(self.model_track, self.release_id).set(1 if self.ready else 0)
 
     def _registry_uri(self, item: dict) -> str:
         """Build a stable MLflow URI, pinning a registered version when present."""
@@ -189,6 +203,7 @@ def create_app(manifest_path: Path | None = None) -> FastAPI:
         return {
             "contract_version": service.manifest["contract_version"],
             "model_track": service.model_track,
+            "model_release_id": service.release_id,
             "manifest_stage": service.manifest.get("stage"),
             "model_alias": service.model_alias,
             "created_at": service.manifest["created_at"],
@@ -220,12 +235,13 @@ def create_app(manifest_path: Path | None = None) -> FastAPI:
             "observed_at": datetime.now(timezone.utc).isoformat(),
             "contract_version": service.manifest["contract_version"],
             "model_track": service.model_track,
+            "model_release_id": service.release_id,
             "model_created_at": service.manifest["created_at"],
             "observation_time": request.observations[-1].time.isoformat(),
             "feature_values": {column: float(features.iloc[0][column]) for column in features.columns},
             "forecast": [item.model_dump() for item in forecasts],
         })
-        return ForecastResponse(request_id=request_id, contract_version=service.manifest["contract_version"], model_track=service.model_track, model_created_at=service.manifest["created_at"], forecast=forecasts)
+        return ForecastResponse(request_id=request_id, contract_version=service.manifest["contract_version"], model_track=service.model_track, model_release_id=service.release_id, model_created_at=service.manifest["created_at"], forecast=forecasts)
 
     return app
 

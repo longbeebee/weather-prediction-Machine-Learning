@@ -97,6 +97,16 @@
       "targets": [{"expr": "weather_model_retraining_required", "refId": "A"}],
       "title": "Retraining required",
       "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 25},
+      "id": 11,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "name"},
+      "targets": [{"expr": "weather_model_release_info{job=\"weather-model-monitoring\"}", "legendFormat": "release={{release_id}}", "refId": "A"}],
+      "title": "Active model release",
+      "type": "stat"
     }
   ],
   "refresh": "15s",

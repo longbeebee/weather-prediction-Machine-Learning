@@ -21,6 +21,17 @@ def promote(evaluation_manifest: Path, output_dir: Path, max_rmse: float = 4.0, 
         raise ValueError(f"promotion gate rejected candidate: {len(failures)} metric rows failed")
     production = dict(manifest)
     production["stage"] = "production"
+    if registry_manifest:
+        registry_payload = json.loads(Path(registry_manifest).read_text(encoding="utf-8"))
+        production["release_id"] = str(
+            registry_payload.get("release_id")
+            or production.get("release_id")
+            or production.get("created_at", "unknown")
+        )
+    else:
+        production["release_id"] = str(
+            production.get("release_id") or production.get("created_at", "unknown")
+        )
     production["promotion"] = {"max_test_rmse": max_rmse, "min_test_f1": min_f1, "gate": "passed"}
     if registry_manifest and tracking_uri:
         production["registry"] = promote_registry_aliases(

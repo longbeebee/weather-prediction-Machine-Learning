@@ -108,6 +108,16 @@ Until the actual-observation feed is deployed, keep the monitoring DAG paused;
 it requires `monitoring/actuals.csv` (or an equivalent mounted file) to join
 predictions with observed outcomes.
 
+Monitoring is scoped to the promoted model release. Promotion writes a
+`release_id` to `production_manifest.json`; the API exposes and logs that ID,
+and the monitoring DAG filters actuals, data-lake rows, performance, and drift
+to the active release. Older prediction logs and S3 archives remain available
+for audit and comparison. Promotion also initializes the Pushgateway monitoring
+metrics to zero for the new release, so Grafana starts with
+`drift_detected=0` and `performance_degraded=0` until the demo simulation
+generates prediction traffic. The subsequent DAG run replaces those values
+with measurements from the new release.
+
 Training feature snapshots are versioned and uploaded to S3 under
 `S3_FEATURE_PREFIX/feature_version=<sha256>/`. After promotion, the training
 run archives raw input, validation output, feature metadata, model binaries,

@@ -24,7 +24,7 @@ def _read_dataset(path: Path) -> pd.DataFrame:
         return connection.execute("SELECT * FROM read_parquet(?)", [str(path)]).fetch_df()
 
 
-def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path, current_features_path: Path | None = None, current_rows: int = 30, reference_rows: int = 180) -> Path:
+def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path, current_features_path: Path | None = None, current_rows: int = 30, reference_rows: int = 180, release_id: str | None = None) -> Path:
     """Compare current production-input features with a historical reference window."""
     try:
         from evidently import Report
@@ -56,7 +56,7 @@ def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path
             # One API request produces seven horizon rows but only one online
             # feature snapshot. Drift must count requests, not horizons.
             if "request_id" in current.columns:
-                current = current.drop_duplicates("request_id", keep="last")
+                current = current.sort_values("observed_at").drop_duplicates("request_id", keep="last")
         else:
             records = []
             for line in log_path.read_text(encoding="utf-8").splitlines():
@@ -67,9 +67,16 @@ def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path
             current = pd.DataFrame(records)
         if len(current) < current_rows:
             raise ValueError(f"need at least {current_rows} production feature logs, found {len(current)}")
+        if release_id is not None:
+            if "model_release_id" not in current.columns:
+                raise ValueError("production feature log is missing model_release_id")
+            current = current[current["model_release_id"] == release_id].copy()
+            if len(current) < current_rows:
+                raise ValueError(f"need at least {current_rows} feature logs for release {release_id}, found {len(current)}")
         missing = [column for column in columns if column not in current.columns]
         if missing:
             raise ValueError(f"production feature log is missing columns: {missing}")
+        current = current.sort_values("observed_at").tail(current_rows) if "observed_at" in current.columns else current.tail(current_rows)
         current = current[columns].apply(pd.to_numeric, errors="coerce").dropna()
     else:
         current = features.iloc[-current_rows:][columns].copy()
@@ -144,6 +151,7 @@ def run_evidently_drift_report(data_path: Path, html_path: Path, json_path: Path
     drift_detected = explicit_drift or drifted_count > 0 or drift_share > 0.0
     summary = {
         "tool": "evidently",
+        "model_release_id": release_id,
         "reference_rows": len(reference),
         "current_rows": len(current),
         "feature_count": len(columns),
@@ -172,9 +180,15 @@ def apply_drift_result(report_path: Path, drift_summary_path: Path, decision_pat
     return Path(report_path)
 
 
-def monitor_predictions(dataset_path: Path, output_path: Path, rmse_limit: float = 4.0, f1_limit: float = 0.55) -> Path:
+def monitor_predictions(dataset_path: Path, output_path: Path, rmse_limit: float = 4.0, f1_limit: float = 0.55, release_id: str | None = None) -> Path:
     """Evaluate the canonical materialized prediction/actual dataset."""
     joined = _read_dataset(dataset_path)
+    if release_id is not None:
+        if "model_release_id" not in joined.columns:
+            raise ValueError("monitoring dataset is missing model_release_id")
+        joined = joined[joined["model_release_id"] == release_id].copy()
+        if joined.empty:
+            raise ValueError(f"monitoring dataset has no rows for release {release_id}")
     required = {"horizon_day", "predicted_temperature", "predicted_rain", "actual_temperature", "actual_rain"}
     if not required.issubset(joined.columns):
         raise ValueError(f"monitoring dataset is missing columns: {sorted(required - set(joined.columns))}")
@@ -183,7 +197,7 @@ def monitor_predictions(dataset_path: Path, output_path: Path, rmse_limit: float
         rmse = float(np.sqrt(mean_squared_error(frame["actual_temperature"], frame["predicted_temperature"])))
         f1 = float(f1_score(frame["actual_rain"], frame["predicted_rain"], zero_division=0))
         rows.append({"horizon_day": int(horizon), "rmse": rmse, "mae": float(mean_absolute_error(frame["actual_temperature"], frame["predicted_temperature"])), "rain_f1": f1, "performance_degraded": rmse > rmse_limit or f1 < f1_limit})
-    result = {"rows": rows, "performance_degraded": any(row["performance_degraded"] for row in rows), "drift_detected": False, "retraining_required": any(row["performance_degraded"] for row in rows)}
+    result = {"model_release_id": release_id, "rows": rows, "performance_degraded": any(row["performance_degraded"] for row in rows), "drift_detected": False, "retraining_required": any(row["performance_degraded"] for row in rows)}
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -207,6 +221,7 @@ def push_monitoring_metrics(report_path: Path, pushgateway_url: str, job: str = 
     """Push bounded-label model metrics for short-lived Airflow jobs."""
     report = json.loads(Path(report_path).read_text(encoding="utf-8"))
     lines = [
+        f'weather_model_release_info{{release_id="{_label(report.get("model_release_id") or "unknown")}"}} 1',
         f"weather_model_performance_degraded {int(bool(report.get('performance_degraded')))}",
         f"weather_model_drift_detected {int(bool(report.get('drift_detected')))}",
         f"weather_model_drifted_feature_count {int(report.get('drifted_feature_count', 0))}",
@@ -219,6 +234,27 @@ def push_monitoring_metrics(report_path: Path, pushgateway_url: str, job: str = 
             f'weather_model_mae{{horizon="{horizon}"}} {float(row["mae"])}',
             f'weather_model_rain_f1{{horizon="{horizon}"}} {float(row["rain_f1"])}',
         ])
+    payload = ("\n".join(lines) + "\n").encode("utf-8")
+    url = pushgateway_url.rstrip("/") + "/metrics/job/" + job
+    request = urllib.request.Request(url, data=payload, method="PUT", headers={"Content-Type": "text/plain; version=0.0.4"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        if response.status >= 300:
+            raise RuntimeError(f"Pushgateway returned HTTP {response.status}")
+
+
+def _label(value: object) -> str:
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def reset_monitoring_metrics(pushgateway_url: str, job: str = "weather_7d_monitoring", release_id: str = "unknown") -> None:
+    """Initialize a newly promoted release as healthy before traffic exists."""
+    lines = [
+        f'weather_model_release_info{{release_id="{_label(release_id)}"}} 1',
+        "weather_model_performance_degraded 0",
+        "weather_model_drift_detected 0",
+        "weather_model_drifted_feature_count 0",
+        "weather_model_retraining_required 0",
+    ]
     payload = ("\n".join(lines) + "\n").encode("utf-8")
     url = pushgateway_url.rstrip("/") + "/metrics/job/" + job
     request = urllib.request.Request(url, data=payload, method="PUT", headers={"Content-Type": "text/plain; version=0.0.4"})
